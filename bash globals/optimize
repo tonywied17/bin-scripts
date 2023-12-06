@@ -1,0 +1,40 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${YEELOW}Please run the script as ${NC}${RED}root${NC} or with ${RED}sudo${NC}."
+    exit 1
+fi
+
+echo -e "${YELLOW}System Optimization:${NC}"
+
+# Clear RAM cache
+echo -e "\n${YELLOW}Clearing RAM Cache...${NC}"
+sync && echo 3 > /proc/sys/vm/drop_caches
+echo -e "${GREEN}RAM Cache cleared.${NC}"
+
+# Optimize disk usage
+echo -e "\n${YELLOW}Optimizing Disk Usage...${NC}"
+fstrim -v /
+echo -e "${GREEN}Disk Usage optimized.${NC}"
+
+# Tune kernel parameters
+echo -e "\n${YELLOW}Tuning Kernel Parameters...${NC}"
+sysctl -w vm.swappiness=10
+echo -e "${GREEN}Kernel Parameters tuned.${NC}"
+
+# Disable unnecessary services
+echo -e "\n${YELLOW}Disabling Unnecessary Services...${NC}"
+#systemctl disable bluetooth.service
+echo -e "${GREEN}Unnecessary Services disabled.${NC}"
+
+# Optimize network settings
+echo -e "\n${YELLOW}Optimizing Network Settings...${NC}"
+sysctl -w net.core.somaxconn=65535
+echo -e "${GREEN}Network Settings optimized.${NC}"
+
+echo -e "${GREEN}System optimization complete.${NC}"
+

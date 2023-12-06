@@ -1,0 +1,3 @@
+#!/bin/bash
+clear
+source /etc/motd.sh

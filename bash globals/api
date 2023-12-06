@@ -1,0 +1,44 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+LIGHT_BLUE='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+if [ "$#" -lt 1 ]; then
+	echo -e "${YELLOW}Restarts API Service${NC}"
+	echo -e "api ${BLUE}restart${NC} ${LIGHT_BLUE}<apiName>${NC}"
+	echo ""
+	echo -e "${YELLOW}Lists all API services${NC}"
+	echo -e "api ${BLUE}list${NC}"
+    exit 1
+fi
+
+command="$1"
+apiName="$2"
+
+if [ "$command" == "list" ]; then
+    echo -e "${YELLOW}List of APIs:${NC}"
+    apiArray=("pa" "juwanji")
+    for api in "${apiArray[@]}"; do
+        echo -e "  ${LIGHT_BLUE}$api${NC}"
+    done
+	echo  	""
+	echo -e "${YELLOW}You may restart an API service by using:${NC}"
+	echo -e "  api ${BLUE}restart${NC} ${LIGHT_BLUE}<apiName>${NC}"
+elif [ "$command" == "restart" ]; then
+    if [ -z "$apiName" ]; then
+        echo -e "${GREEN}Usage:${NC} api ${BLUE}restart${NC} ${LIGHT_BLUE}<apiName>${NC}"
+	echo -e "  ${YELLOW}Specify the ${LIGHT_BLUE}<apiName>${NC} to restart${NC}"
+        exit 1
+    fi
+    cd "/home/tonewebdesign/public_html/api.tonewebdesign.com/${apiName}-api/tmp/"
+    touch restart.txt
+    echo -e "${YELLOW}Restart file created for API:${NC} ${LIGHT_BLUE}$apiName${NC}"
+else
+    echo -e "${RED}Invalid command:${NC} $command"
+    exit 1
+fi
+

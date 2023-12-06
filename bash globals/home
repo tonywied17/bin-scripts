@@ -1,0 +1,5 @@
+#!/bin/bash
+clear
+source /etc/motd.sh
+cd /home
+$SHELL

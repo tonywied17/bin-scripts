@@ -1,0 +1,69 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+LIGHT_BLUE='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+if [ "$#" -lt 1 ]; then
+    echo -e "${GREEN}Usage:${NC}"
+    echo -e "  ${YELLOW}..prod${NC}      bot ${BLUE}prod${NC} ${LIGHT_BLUE}<stop/start> <botName>${NC} ${RED}<startFile>${NC}"
+    echo -e "  ${YELLOW}..dev${NC}       bot ${BLUE}dev start${NC} ${LIGHT_BLUE}<botName>${NC} ${RED}<startFile>${NC}"
+    echo -e "  ${YELLOW}..list${NC}      bot ${BLUE}list${NC}"
+    exit 1
+fi
+
+environment="$1"
+command="$2"
+botName="$3"
+startUpFile="$4"
+
+case "$environment" in
+    "prod")
+        case "$command" in
+            "start")
+                echo -e "${GREEN}[Starting]${NC}${YELLOW} Discord bot ${NC}${LIGHT_BLUE}<$botName>${NC} ${YELLOW}in production${NC}"
+                forever stop "$botName"
+                cd /home/bots/"$botName"/
+                forever start -a --uid "$botName" "$startUpFile"
+                ;;
+            "stop")
+                echo -e "${RED}[Stopping]${NC}${YELLOW} Discord bot ${LIGHT_BLUE}<$botName>${NC}${YELLOW} in production${NC}"
+                forever stop "$botName"
+                ;;
+            *)
+                echo -e "${RED}Invalid command:${NC} $command. Use ${LIGHT_BLUE}<stop/start/list>${NC}"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    "dev")
+        case "$command" in
+            "start")
+                echo -e "${GREEN}[Starting]${NC} Discord bot ${LIGHT_BLUE}<$botName>${NC}${YELLOW} in development${NC}"
+                cd /home/bots/"$botName"/
+                forever stop "$botName"
+                node "$startUpFile"
+                ;;
+            *)
+                echo -e "${RED}Invalid command: $command. Use start.${NC}"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    "list")
+        echo -e "${YELLOW}Listing bots in production${NC}"
+        cd /home/bots/"$botName"/
+        forever list
+        ;;
+
+    *)
+        echo -e "${RED}Invalid environment:${NC} $environment. Use ${LIGHT_BLUE}<prod/dev/list>${NC}"
+        exit 1
+        ;;
+esac
+
