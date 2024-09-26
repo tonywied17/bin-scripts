@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Check if a domain is pointing to the server
+check_domain() {
+    local domain=$1
+    local expected_ip="172.105.148.88"
+    local resolved_ip=$(dig +short "$domain" | head -n 1)
+
+    if [ "$resolved_ip" == "$expected_ip" ]; then
+        echo -e "${GREEN}Domain $domain is correctly pointing to $expected_ip.${NC}"
+    else
+        echo -e "${RED}Warning: Domain $domain does not resolve to $expected_ip. Please check your A record.${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# Prompt for user input
+read -p "Enter domain (e.g., example.com): " domain
+read -p "Enter username: " username
+read -sp "Enter password: " password
+echo ""
+
+# Add user silently
+sudo adduser --quiet --disabled-password --gecos "" "$username"
+echo "$username:$password" | sudo chpasswd
+
+# Create public_html directory
+sudo mkdir -p /home/"$username"/public_html
+sudo chown -R "$username":"$username" /home/"$username"/public_html
+sudo chmod -R 755 /home/"$username"
+
+# Create Apache config for the new site
+sudo tee /etc/apache2/sites-available/"$domain".conf > /dev/null <<EOL
+<VirtualHost *:80>
+    ServerName $domain
+    DocumentRoot /home/$username/public_html
+
+    <Directory /home/$username/public_html>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/$domain-error.log
+    CustomLog \${APACHE_LOG_DIR}/$domain-access.log combined
+</VirtualHost>
+EOL
+
+# Enable the site
+sudo a2ensite "$domain.conf"
+sudo systemctl reload apache2
+
+# Check the domain
+if check_domain "$domain"; then
+    # Ask if user wants to add SSL
+    read -p "Do you want to set up SSL for $domain? (y/n): " ssl_choice
+    if [[ "$ssl_choice" == [Yy] ]]; then
+        sudo certbot --apache -d "$domain" --non-interactive --agree-tos --email your_email@example.com
+    fi
+fi
+
+echo -e "${GREEN}Web user $username with domain $domain has been created successfully!${NC}"

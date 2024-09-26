@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "Listing root PM2 instances:"
+sudo pm2 list
+echo ""
+echo "Listing PM2 instances for user molexcloud:"
+sudo -u molexcloud pm2 list
+echo ""
+echo "Listing PM2 instances for user wortool:"
+sudo -u wortool pm2 list
+echo ""
+echo "Listing PM2 instances for user paarmy:"
+sudo -u paarmy pm2 list
+echo ""
+echo "Listing PM2 instances for user twotwotwo:"
+sudo -u twotwotwo pm2 list

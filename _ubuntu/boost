@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Color codes
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' 
+
+display_message() {
+    echo -e "${GREEN}$1${NC}"
+}
+
+display_message "Starting performance booster script..."
+
+# 1. Update package lists
+display_message "Updating package lists..."
+sudo apt-get update -y
+
+# 2. Upgrade installed packages
+display_message "Upgrading installed packages..."
+sudo apt-get upgrade -y
+
+# 3. Remove unnecessary packages
+display_message "Removing unused packages..."
+sudo apt-get autoremove -y
+
+# 4. Clean up package cache
+display_message "Cleaning up package cache..."
+sudo apt-get clean
+
+# 5. Clear systemd journal logs older than 7 days
+display_message "Clearing old journal logs..."
+sudo journalctl --vacuum-time=7d
+
+# 6. Clean up temporary files
+display_message "Cleaning up temporary files..."
+sudo rm -rf /tmp/*
+sudo rm -rf /var/tmp/*
+
+# 7. Optimize file system
+display_message "Optimizing file system..."
+sudo fstrim -v /
+
+# 8. Display current memory usage
+display_message "Current memory usage:"
+free -h
+
+# 9. Display disk usage
+display_message "Current disk usage:"
+df -h
+
+display_message "Performance booster script completed."
