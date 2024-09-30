@@ -40,20 +40,22 @@ read -r choice
 #! Enable or disable 2Auth based on user input
 if [[ "$choice" =~ ^[Yy]$ ]]; then
     if [ "$AUTH_ENABLED" = true ]; then
-        # Disable 2Auth
+
+        #? Disable 2Auth
         sudo sed -i 's/^auth.*required.*pam_google_authenticator.so/#&/' "$PAM_SSHD_FILE"
         
-        # Remove keyboard-interactive from SSH config
+        #? Remove keyboard-interactive
         if [ "$KEYBOARD_INTERACTIVE" = true ]; then
             sudo sed -i 's/^AuthenticationMethods.*keyboard-interactive/AuthenticationMethods publickey/' "$SSH_CONFIG_FILE"
         fi
 
         echo -e "\e[31m2Auth Disabled\e[0m"
     else
-        # Enable 2Auth
+    
+        #? Enable 2Auth
         sudo sed -i 's/^#auth.*required.*pam_google_authenticator.so/auth   required   pam_google_authenticator.so/' "$PAM_SSHD_FILE"
 
-        # Add keyboard-interactive to SSH config
+        #? Add keyboard-interactive
         if ! grep -q "^AuthenticationMethods.*keyboard-interactive" "$SSH_CONFIG_FILE"; then
             sudo sed -i 's/^AuthenticationMethods publickey/AuthenticationMethods publickey,keyboard-interactive/' "$SSH_CONFIG_FILE"
         fi
