@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Color codes
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
@@ -16,7 +15,9 @@ fi
 
 find "$DIRECTORY" -maxdepth 1 -type l -print | while read -r link; do
     target=$(readlink "$link")
+    # Get only the basename of the link
     link_name=$(basename "$link")
+
     formatted="${LIGHT_BLUE}${link_name}${NC}\n${BLUE}   ➥ ${target}${NC}"
     echo -e "$formatted"
 done

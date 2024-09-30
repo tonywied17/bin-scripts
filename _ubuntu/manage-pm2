@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Function to list PM2 instances for a user
+list_pm2_instances() {
+    local user="$1"
+    echo -e "${YELLOW}Listing PM2 instances for user $user:${NC}"
+    sudo -u "$user" pm2 list
+    echo ""
+}
+
+# Function to manage PM2 instances
+manage_pm2() {
+    echo "Select an option:"
+    echo "1) List PM2 instances for a user"
+    echo "2) Start a PM2 instance"
+    echo "3) Stop a PM2 instance"
+    echo "4) Restart a PM2 instance"
+    echo "5) Delete a PM2 instance"
+    echo "6) Exit"
+
+    read -p "Choose an option (1-6): " option
+
+    case $option in
+        1)
+            read -p "Enter the username (e.g., molex, molexcloud, wortool, paarmy, twotwotwo): " username
+            list_pm2_instances "$username"
+            manage_pm2  # Call manage_pm2 again for further actions
+            ;;
+        2)
+            read -p "Enter the username: " username
+            read -p "Enter the PM2 instance name or ID to start: " instance_name
+            sudo -u "$username" pm2 start "$instance_name"
+            echo -e "${GREEN}Started PM2 instance $instance_name for user $username.${NC}"
+            manage_pm2
+            ;;
+        3)
+            read -p "Enter the username: " username
+            read -p "Enter the PM2 instance name or ID to stop: " instance_name
+            sudo -u "$username" pm2 stop "$instance_name"
+            echo -e "${GREEN}Stopped PM2 instance $instance_name for user $username.${NC}"
+            manage_pm2
+            ;;
+        4)
+            read -p "Enter the username: " username
+            read -p "Enter the PM2 instance name or ID to restart: " instance_name
+            sudo -u "$username" pm2 restart "$instance_name"
+            echo -e "${GREEN}Restarted PM2 instance $instance_name for user $username.${NC}"
+            manage_pm2
+            ;;
+        5)
+            read -p "Enter the username: " username
+            read -p "Enter the PM2 instance name or ID to delete: " instance_name
+            sudo -u "$username" pm2 delete "$instance_name"
+            echo -e "${GREEN}Deleted PM2 instance $instance_name for user $username.${NC}"
+            manage_pm2
+            ;;
+        6)
+            echo -e "${YELLOW}Exiting PM2 manager.${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Invalid option. Please choose a valid option.${NC}"
+            manage_pm2
+            ;;
+    esac
+}
+
+# Start the PM2 manager
+manage_pm2

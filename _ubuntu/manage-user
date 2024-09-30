@@ -1,0 +1,188 @@
+#!/bin/bash
+
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Function to check if a domain is pointing to the server
+check_domain() {
+    local domain=$1
+    local expected_ip="172.105.148.88"
+    local resolved_ip=$(dig +short "$domain" | head -n 1)
+
+    if [ "$resolved_ip" == "$expected_ip" ]; then
+        echo -e "${GREEN}Domain $domain is correctly pointing to $expected_ip.${NC}"
+    else
+        echo -e "${RED}Warning: Domain $domain does not resolve to $expected_ip. Please check your A record.${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# Function to add a new user and set up Apache
+add_user_and_setup_apache() {
+    read -p "Enter domain (e.g., example.com): " domain
+    read -p "Enter username: " username
+    read -sp "Enter password: " password
+    echo ""  # for newline after password prompt
+
+    # Check if the domain is pointing to the server
+    check_domain "$domain" || return 1
+
+    # Add user silently
+    if sudo adduser --quiet --disabled-password --gecos "" "$username"; then
+        echo -e "${GREEN}User $username added successfully.${NC}"
+    else
+        echo -e "${RED}Failed to add user $username. Exiting.${NC}"
+        return 1
+    fi
+
+    # Set the user's password
+    echo "$username:$password" | sudo chpasswd
+
+    # Create public_html directory
+    sudo mkdir -p /home/"$username"/public_html
+    sudo chown -R "$username":"$username" /home/"$username"/public_html
+    sudo chmod -R 755 /home/"$username"
+
+    # Create Apache config for the new site
+    sudo tee /etc/apache2/sites-available/"$domain".conf > /dev/null <<EOL
+<VirtualHost *:80>
+    ServerName $domain
+    DocumentRoot /home/$username/public_html
+
+    <Directory /home/$username/public_html>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/$domain-error.log
+    CustomLog \${APACHE_LOG_DIR}/$domain-access.log combined
+</VirtualHost>
+EOL
+
+    # Enable the new site and reload Apache
+    sudo a2ensite "$domain.conf"
+    sudo systemctl reload apache2
+
+    # Ask if the user wants to set up an initial SSL
+    read -p "Do you want to set up an SSL certificate for $domain? (y/n): " setup_ssl
+    if [[ "$setup_ssl" == "y" ]]; then
+        setup_ssl_certificate "$domain"
+    fi
+}
+
+# Function to set up SSL certificate with Certbot
+setup_ssl_certificate() {
+    local domain=$1
+    echo -e "${YELLOW}Setting up SSL certificate for $domain...${NC}"
+    
+    sudo certbot --apache --email tonywied17@gmail.com --agree-tos --no-eff-email --redirect -d "$domain"
+    
+    echo -e "${GREEN}SSL certificate for $domain has been set up successfully.${NC}"
+}
+
+# Function to renew an SSL certificate for a given domain
+renew_ssl_certificate() {
+    read -p "Enter the domain to renew SSL (e.g., example.com): " domain
+    echo -e "${YELLOW}Renewing SSL certificate for $domain...${NC}"
+    
+    sudo certbot renew --cert-name "$domain" --quiet
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}SSL certificate for $domain renewed successfully, if it was due for renewal.${NC}"
+    else
+        echo -e "${RED}Failed to renew SSL certificate for $domain.${NC}"
+    fi
+}
+
+# Function to remove a user and their Apache configuration
+remove_user_and_cleanup() {
+    read -p "Enter the username to remove: " username
+    read -p "Enter the domain for the user to remove (e.g., example.com): " domain
+
+    # Check if the user exists
+    if id "$username" &>/dev/null; then
+        echo -e "${YELLOW}Removing user $username...${NC}"
+
+        # Remove the user's home directory and files
+        sudo deluser --remove-home "$username"
+        echo -e "${GREEN}User $username removed successfully.${NC}"
+    else
+        echo -e "${RED}User $username does not exist. Proceeding to remove Apache configuration...${NC}"
+    fi
+
+    # Prompt to remove the Apache configuration
+    read -p "Do you want to remove the Apache configuration for $domain? (y/n): " remove_apache
+    if [[ "$remove_apache" == "y" ]]; then
+        # Define the configuration files
+        config_file="/etc/apache2/sites-available/${domain}.conf"
+        ssl_config_file="/etc/apache2/sites-available/${domain}-le-ssl.conf"
+        cert_dir="/etc/letsencrypt/live/${domain}"
+
+        # Remove the main configuration file
+        if [ -f "$config_file" ]; then
+            echo -e "${YELLOW}Removing Apache configuration for $domain...${NC}"
+            sudo a2dissite "${domain}.conf"  # Disable the site
+            sudo rm "$config_file"           # Remove the config file
+            echo -e "${GREEN}Apache configuration for $domain removed successfully.${NC}"
+        else
+            echo -e "${RED}Apache configuration file for $domain not found.${NC}"
+        fi
+
+        # Optionally remove SSL configuration
+        if [ -f "$ssl_config_file" ]; then
+            echo -e "${YELLOW}Removing SSL configuration for $domain...${NC}"
+            sudo rm "$ssl_config_file"
+            echo -e "${GREEN}SSL configuration for $domain removed successfully.${NC}"
+        fi
+
+        # Prompt to remove logs
+        read -p "Do you want to remove logs for $domain? (y/n): " remove_logs
+        if [[ "$remove_logs" == "y" ]]; then
+            error_log="/var/log/apache2/${domain}-error.log"
+            access_log="/var/log/apache2/${domain}-access.log"
+
+            if [ -f "$error_log" ]; then
+                sudo rm "$error_log"
+                echo -e "${GREEN}Error log for $domain removed successfully.${NC}"
+            else
+                echo -e "${RED}Error log for $domain not found.${NC}"
+            fi
+
+            if [ -f "$access_log" ]; then
+                sudo rm "$access_log"
+                echo -e "${GREEN}Access log for $domain removed successfully.${NC}"
+            else
+                echo -e "${RED}Access log for $domain not found.${NC}"
+            fi
+        fi
+    fi
+}
+
+# Main menu function
+show_menu() {
+    while true; do
+        echo ""
+        echo "=== User and SSL Management Menu ==="
+        echo "1) Add User and Setup Apache"
+        echo "2) Renew SSL Certificate"
+        echo "3) Remove User and Apache Configuration"
+        echo "4) Exit"
+        read -p "Select an option (1-3): " option
+
+        case $option in
+            1) add_user_and_setup_apache ;;
+            2) renew_ssl_certificate ;;
+            3) remove_user_and_cleanup ;;
+            4) echo "Exiting..."; exit 0 ;;
+            *) echo -e "${RED}Invalid option. Please select 1-3.${NC}" ;;
+        esac
+    done
+}
+
+# Start the menu
+show_menu

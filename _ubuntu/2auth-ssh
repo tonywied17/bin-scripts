@@ -41,7 +41,7 @@ if [[ "$choice" =~ ^[Yy]$ ]]; then
     if [ "$AUTH_ENABLED" = true ]; then
         # Disable 2Auth
         sudo sed -i 's/^auth.*required.*pam_google_authenticator.so/#&/' "$PAM_SSHD_FILE"
-
+        
         # Remove keyboard-interactive from SSH config
         if [ "$KEYBOARD_INTERACTIVE" = true ]; then
             sudo sed -i 's/^AuthenticationMethods.*keyboard-interactive/AuthenticationMethods publickey/' "$SSH_CONFIG_FILE"

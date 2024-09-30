@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Function to view running services
+view_running_services() {
+    echo -e "\n${YELLOW}Currently running services:${NC}"
+    systemctl list-units --type=service --state=running
+}
+
+# Function to restart a running service
+restart_running_service() {
+    read -p "Enter the name of the service to restart: " service_name
+    sudo systemctl restart "$service_name"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}$service_name has been restarted successfully.${NC}"
+    else
+        echo -e "${RED}Failed to restart $service_name. Please check the service name and try again.${NC}"
+    fi
+}
+
+# Function to stop a running service
+stop_running_service() {
+    read -p "Enter the name of the service to stop: " service_name
+    sudo systemctl stop "$service_name"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}$service_name has been stopped successfully.${NC}"
+    else
+        echo -e "${RED}Failed to stop $service_name. Please check the service name and try again.${NC}"
+    fi
+}
+
+# Function to start a service
+start_running_service() {
+    read -p "Enter the name of the service to start: " service_name
+    sudo systemctl start "$service_name"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}$service_name has been started successfully.${NC}"
+    else
+        echo -e "${RED}Failed to start $service_name. Please check the service name and try again.${NC}"
+    fi
+}
+
+# Main menu
+while true; do
+    echo -e "\n${YELLOW}Systemd Service Management Menu:${NC}"
+    echo "1) View Running Services"
+    echo "2) Restart Running Service"
+    echo "3) Stop Running Service"
+    echo "4) Start Running Service"
+    echo "5) Exit"
+    read -p "Select an option (1-5): " choice
+
+    case $choice in
+        1) view_running_services ;;
+        2) restart_running_service ;;
+        3) stop_running_service ;;
+        4) start_running_service ;;
+        5) echo "Exiting..."; exit 0 ;;
+        *) echo -e "${RED}Invalid choice. Please select a valid option.${NC}" ;;
+    esac
+done
