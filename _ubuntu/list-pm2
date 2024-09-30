@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "Listing root PM2 instances:"
-sudo pm2 list
+echo "Listing PM2 instances for user molex:"
+pm2 list
 echo ""
 echo "Listing PM2 instances for user molexcloud:"
 sudo -u molexcloud pm2 list

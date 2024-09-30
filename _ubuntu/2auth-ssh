@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Define file paths
+PAM_SSHD_FILE="/etc/pam.d/sshd"
+SSH_CONFIG_FILE="/etc/ssh/sshd_config"
+
+# Function to restart SSH service
+restart_ssh() {
+    sudo systemctl restart ssh
+}
+
+# Detect if 2Auth is enabled or disabled
+if grep -qE "^#*auth.*required.*pam_google_authenticator.so" "$PAM_SSHD_FILE"; then
+    if grep -qE "^auth.*required.*pam_google_authenticator.so" "$PAM_SSHD_FILE"; then
+        AUTH_ENABLED=true  # 2Auth is enabled (line not commented)
+    else
+        AUTH_ENABLED=false # 2Auth is disabled (line is commented)
+    fi
+else
+    echo -e "\e[31mError: Could not find the pam_google_authenticator.so line in $PAM_SSHD_FILE\e[0m"
+    exit 1
+fi
+
+# Detect if keyboard-interactive is in SSH config
+if grep -q "^AuthenticationMethods.*keyboard-interactive" "$SSH_CONFIG_FILE"; then
+    KEYBOARD_INTERACTIVE=true
+else
+    KEYBOARD_INTERACTIVE=false
+fi
+
+# Display current status and prompt for action
+if [ "$AUTH_ENABLED" = true ]; then
+    echo -e "\e[32m2Auth is Already Enabled, would you like to disable it? (y/n)\e[0m"
+else
+    echo -e "\e[31m2Auth is Disabled, would you like to enable it? (y/n)\e[0m"
+fi
+
+read -r choice
+
+if [[ "$choice" =~ ^[Yy]$ ]]; then
+    if [ "$AUTH_ENABLED" = true ]; then
+        # Disable 2Auth
+        sudo sed -i 's/^auth.*required.*pam_google_authenticator.so/#&/' "$PAM_SSHD_FILE"
+
+        # Remove keyboard-interactive from SSH config
+        if [ "$KEYBOARD_INTERACTIVE" = true ]; then
+            sudo sed -i 's/^AuthenticationMethods.*keyboard-interactive/AuthenticationMethods publickey/' "$SSH_CONFIG_FILE"
+        fi
+
+        echo -e "\e[31m2Auth Disabled\e[0m"
+    else
+        # Enable 2Auth
+        sudo sed -i 's/^#auth.*required.*pam_google_authenticator.so/auth   required   pam_google_authenticator.so/' "$PAM_SSHD_FILE"
+
+        # Add keyboard-interactive to SSH config
+        if ! grep -q "^AuthenticationMethods.*keyboard-interactive" "$SSH_CONFIG_FILE"; then
+            sudo sed -i 's/^AuthenticationMethods publickey/AuthenticationMethods publickey,keyboard-interactive/' "$SSH_CONFIG_FILE"
+        fi
+
+        echo -e "\e[32m2Auth Enabled\e[0m"
+    fi
+
+    # Restart SSH service and show confirmation
+    restart_ssh
+    echo -e "\e[34mSSH Service Restarted Successfully\e[0m"
+else
+    echo -e "\e[33mNo changes made.\e[0m"
+fi
