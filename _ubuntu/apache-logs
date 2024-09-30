@@ -1,31 +1,30 @@
 #!/bin/bash
 
-# Directory paths
+#! Directory paths
 LOG_DIR="/var/log/apache2"
 APACHE_SITES_DIR="/etc/apache2/sites-enabled"
 
-# Color codes for clarity
+#! Color codes
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Function to filter and display primary log files (e.g., *.log files)
+#! Filter and display primary log files (e.g., *.log files) from /var/log/apache2
 filter_primary_logs() {
     echo -e "${YELLOW}Filtering primary log files...${NC}"
     log_files=()
     index=1
 
-    # Using sudo to list all files in the log directory
+    # List all files in the log directory
     mapfile -t files < <(sudo ls "$LOG_DIR")
 
-    # Check if there are any log files
     if [ ${#files[@]} -eq 0 ]; then
         echo -e "${RED}No log files found in $LOG_DIR.${NC}"
         return
     fi
 
-    # Collect and display log files
+    # Log files with an index number
     for log in "${files[@]}"; do
         if [[ $log == *.log ]]; then
             log_files+=("$log")
@@ -39,7 +38,7 @@ filter_primary_logs() {
         return
     fi
 
-    # Prompt for user selection
+    # Prompt for log selection
     read -p "Select a log file to view (1-${#log_files[@]}): " log_index
 
     if [[ $log_index -ge 1 && $log_index -le ${#log_files[@]} ]]; then
@@ -51,30 +50,29 @@ filter_primary_logs() {
     fi
 }
 
-# Function to purge unmatched logs
+#! Purge logs that don't match any enabled Apache sites
 purge_unmatched_logs() {
+
     # Fetch primary logs
     log_files=()
     mapfile -t files < <(sudo ls "$LOG_DIR")
 
-    # Check if there are any log files
     if [ ${#files[@]} -eq 0 ]; then
         echo -e "${RED}No log files found in $LOG_DIR.${NC}"
         return
     fi
 
-    # List enabled Apache sites
+    # List enabled apache sites
     mapfile -t enabled_sites < <(sudo ls "$APACHE_SITES_DIR" | sed 's/\.conf//g')
 
     # Filter unmatched logs
     unmatched_logs=()
     for log in "${files[@]}"; do
-        # Skip log files that are access or error logs
+        # Skip main access and error logs
         if [[ "$log" == *"access.log" || "$log" == *"error.log" ]]; then
             continue
         fi
 
-        # Extract domain name from the log filename
         domain_name=$(echo "$log" | sed -E 's/-access\.log$//; s/-error\.log$//')
 
         # Check if the domain is not in enabled sites
@@ -83,7 +81,7 @@ purge_unmatched_logs() {
         fi
     done
 
-    # Display unmatched logs and prompt user for action
+    # Display unmatched logs and prompt for action
     if [ ${#unmatched_logs[@]} -eq 0 ]; then
         echo -e "${GREEN}No unmatched log files found.${NC}"
     else
@@ -104,12 +102,12 @@ purge_unmatched_logs() {
     fi
 }
 
-# Function to purge backup logs
+#! Purge backup logs
 purge_backup_logs() {
     echo -e "${YELLOW}Purging backup logs...${NC}"
     backup_logs=()
     
-    # Using sudo to find backup files (e.g., *.1, *.tgz)
+    # Find backup files (*.1, *.tgz)
     mapfile -t files < <(sudo ls "$LOG_DIR")
 
     for log in "${files[@]}"; do
@@ -135,7 +133,7 @@ purge_backup_logs() {
     fi
 }
 
-# Main menu
+#! Main menu
 while true; do
     echo -e "\nMenu:"
     echo "1) Filter Primary Logs"

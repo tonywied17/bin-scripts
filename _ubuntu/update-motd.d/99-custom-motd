@@ -1,19 +1,19 @@
 #!/bin/sh
 
-# Color codes
+#! Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# List commands in /usr/local/bin
+#! List commands in /usr/local/bin
 printf "\nAvailable commands in ${BLUE}/usr/local/bin${NC}:\n"
 for cmd in /usr/local/bin/*; do
     [ -e "$cmd" ] && printf "${GREEN}%s${NC}\n" "$(basename "$cmd")"
 done
 
-# List users in /home
+#! List users in /home
 printf "\nUsers in ${BLUE}/home${NC}:\n"
 for user_dir in /home/*; do
     [ -d "$user_dir" ] && printf "${YELLOW}%s${NC}\n" "$(basename "$user_dir")"

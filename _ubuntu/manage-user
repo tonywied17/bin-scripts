@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Color codes
+#! Color codes
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Function to check if a domain is pointing to the server
+#! Function to check if a domain is pointing to the server
 check_domain() {
     local domain=$1
     local expected_ip="172.105.148.88"
@@ -21,12 +21,12 @@ check_domain() {
     return 0
 }
 
-# Function to add a new user and set up Apache
+#! Function to add a new user and set up Apache
 add_user_and_setup_apache() {
     read -p "Enter domain (e.g., example.com): " domain
     read -p "Enter username: " username
     read -sp "Enter password: " password
-    echo ""  # for newline after password prompt
+    echo ""
 
     # Check if the domain is pointing to the server
     check_domain "$domain" || return 1
@@ -64,18 +64,18 @@ add_user_and_setup_apache() {
 </VirtualHost>
 EOL
 
-    # Enable the new site and reload Apache
+    # Enable the new site and reload apache
     sudo a2ensite "$domain.conf"
     sudo systemctl reload apache2
 
-    # Ask if the user wants to set up an initial SSL
+    # Prompt to set up SSL certificate
     read -p "Do you want to set up an SSL certificate for $domain? (y/n): " setup_ssl
     if [[ "$setup_ssl" == "y" ]]; then
         setup_ssl_certificate "$domain"
     fi
 }
 
-# Function to set up SSL certificate with Certbot
+#! Set up SSL certificate with Certbot
 setup_ssl_certificate() {
     local domain=$1
     echo -e "${YELLOW}Setting up SSL certificate for $domain...${NC}"
@@ -85,7 +85,7 @@ setup_ssl_certificate() {
     echo -e "${GREEN}SSL certificate for $domain has been set up successfully.${NC}"
 }
 
-# Function to renew an SSL certificate for a given domain
+#! Renew an SSL certificate for a given domain
 renew_ssl_certificate() {
     read -p "Enter the domain to renew SSL (e.g., example.com): " domain
     echo -e "${YELLOW}Renewing SSL certificate for $domain...${NC}"
@@ -99,7 +99,7 @@ renew_ssl_certificate() {
     fi
 }
 
-# Function to remove a user and their Apache configuration
+#! Remove a user and their Apache configuration
 remove_user_and_cleanup() {
     read -p "Enter the username to remove: " username
     read -p "Enter the domain for the user to remove (e.g., example.com): " domain
@@ -115,10 +115,10 @@ remove_user_and_cleanup() {
         echo -e "${RED}User $username does not exist. Proceeding to remove Apache configuration...${NC}"
     fi
 
-    # Prompt to remove the Apache configuration
+    # Prompt to remove the apache configuration
     read -p "Do you want to remove the Apache configuration for $domain? (y/n): " remove_apache
     if [[ "$remove_apache" == "y" ]]; then
-        # Define the configuration files
+        # Configuration files
         config_file="/etc/apache2/sites-available/${domain}.conf"
         ssl_config_file="/etc/apache2/sites-available/${domain}-le-ssl.conf"
         cert_dir="/etc/letsencrypt/live/${domain}"
@@ -126,14 +126,14 @@ remove_user_and_cleanup() {
         # Remove the main configuration file
         if [ -f "$config_file" ]; then
             echo -e "${YELLOW}Removing Apache configuration for $domain...${NC}"
-            sudo a2dissite "${domain}.conf"  # Disable the site
-            sudo rm "$config_file"           # Remove the config file
+            sudo a2dissite "${domain}.conf" 
+            sudo rm "$config_file"           
             echo -e "${GREEN}Apache configuration for $domain removed successfully.${NC}"
         else
             echo -e "${RED}Apache configuration file for $domain not found.${NC}"
         fi
 
-        # Optionally remove SSL configuration
+        # Remove SSL configuration if it exists
         if [ -f "$ssl_config_file" ]; then
             echo -e "${YELLOW}Removing SSL configuration for $domain...${NC}"
             sudo rm "$ssl_config_file"
@@ -163,7 +163,7 @@ remove_user_and_cleanup() {
     fi
 }
 
-# Main menu function
+#! Main menu
 show_menu() {
     while true; do
         echo ""
@@ -184,5 +184,5 @@ show_menu() {
     done
 }
 
-# Start the menu
+#! Start the menu
 show_menu

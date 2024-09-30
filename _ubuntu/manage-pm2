@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Color codes
+#! Color codes
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Function to list PM2 instances for a user
+#! List PM2 instances for a user
 list_pm2_instances() {
     local user="$1"
     echo -e "${YELLOW}Listing PM2 instances for user $user:${NC}"
@@ -14,7 +14,7 @@ list_pm2_instances() {
     echo ""
 }
 
-# Function to manage PM2 instances
+#! Manage PM2 instances
 manage_pm2() {
     echo "Select an option:"
     echo "1) List PM2 instances for a user"
@@ -30,7 +30,7 @@ manage_pm2() {
         1)
             read -p "Enter the username (e.g., molex, molexcloud, wortool, paarmy, twotwotwo): " username
             list_pm2_instances "$username"
-            manage_pm2  # Call manage_pm2 again for further actions
+            manage_pm2
             ;;
         2)
             read -p "Enter the username: " username
@@ -71,5 +71,5 @@ manage_pm2() {
     esac
 }
 
-# Start the PM2 manager
+#! Start the PM2 manager
 manage_pm2

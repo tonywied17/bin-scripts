@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Function to view running services
+#! View running services
 view_running_services() {
     echo -e "\n${YELLOW}Currently running services:${NC}"
     systemctl list-units --type=service --state=running
 }
 
-# Function to restart a running service
+#! Restart a running service
 restart_running_service() {
     read -p "Enter the name of the service to restart: " service_name
     sudo systemctl restart "$service_name"
@@ -17,7 +17,7 @@ restart_running_service() {
     fi
 }
 
-# Function to stop a running service
+#! Stop a running service
 stop_running_service() {
     read -p "Enter the name of the service to stop: " service_name
     sudo systemctl stop "$service_name"
@@ -28,7 +28,7 @@ stop_running_service() {
     fi
 }
 
-# Function to start a service
+#! Start a service
 start_running_service() {
     read -p "Enter the name of the service to start: " service_name
     sudo systemctl start "$service_name"
@@ -39,7 +39,7 @@ start_running_service() {
     fi
 }
 
-# Main menu
+#! Main menu
 while true; do
     echo -e "\n${YELLOW}Systemd Service Management Menu:${NC}"
     echo "1) View Running Services"
