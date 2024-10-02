@@ -32,7 +32,7 @@ add_user_and_setup_apache() {
     check_domain "$domain" || return 1
 
     # Add user silently
-    if sudo adduser --quiet --disabled-password --gecos "" "$username"; then
+    if sudo adduser --quiet --disabled-password --gecos "" --home "/home/$username" "$username"; then
         echo -e "${GREEN}User $username added successfully.${NC}"
     else
         echo -e "${RED}Failed to add user $username. Exiting.${NC}"
@@ -46,6 +46,49 @@ add_user_and_setup_apache() {
     sudo mkdir -p /home/"$username"/public_html
     sudo chown -R "$username":"$username" /home/"$username"/public_html
     sudo chmod -R 755 /home/"$username"
+
+    # Create cgi-bin directory
+    sudo mkdir -p /home/"$username"/public_html/cgi-bin
+    sudo chown -R "$username":"$username" /home/"$username"/public_html/cgi-bin
+    sudo chmod -R 755 /home/"$username"/public_html/cgi-bin
+
+    # Create welcome.md file
+    sudo tee /home/"$username"/public_html/welcome.md > /dev/null <<EOL
+# Welcome to $domain
+
+This is the default page for $domain.
+
+## FTP Access
+You can upload your files to this server using an FTP client.
+
+### FTP Details
+- **Host:** $domain
+- **Username:** $username
+- **Password:** Your chosen password
+- **Port:** 21
+
+## Webmail
+You can access the roundcube webmail client by visiting [mail.$domain](https://mail.$domain).
+
+## Postfix Admin
+You can manage your email accounts using the Postfix Admin interface.
+EOL
+
+    # Move .dir directory into public_html
+    if [ -d /home/"$username"/.dir ]; then
+        sudo mv /home/"$username"/.dir /home/"$username"/public_html/
+        sudo chown -R "$username":"$username" /home/"$username"/public_html/.dir
+    else
+        echo -e "${YELLOW}Warning: .dir does not exist for user $username.${NC}"
+    fi
+
+    # Move .htaccess file into public_html
+    if [ -e /home/"$username"/.htaccess ]; then
+        sudo mv /home/"$username"/.htaccess /home/"$username"/public_html/.htaccess
+        sudo chown "$username":"$username" /home/"$username"/public_html/.htaccess
+    else
+        echo -e "${YELLOW}Warning: .htaccess does not exist for user $username.${NC}"
+    fi
 
     # Create Apache config for the new site
     sudo tee /etc/apache2/sites-available/"$domain".conf > /dev/null <<EOL
@@ -138,6 +181,14 @@ remove_user_and_cleanup() {
             echo -e "${YELLOW}Removing SSL configuration for $domain...${NC}"
             sudo rm "$ssl_config_file"
             echo -e "${GREEN}SSL configuration for $domain removed successfully.${NC}"
+        fi
+
+        # Remove symlink in sites-enabled
+        symlink_file="/etc/apache2/sites-enabled/${domain}.conf"
+        if [ -L "$symlink_file" ]; then
+            echo -e "${YELLOW}Removing symlink for $domain in sites-enabled...${NC}"
+            sudo rm "$symlink_file"
+            echo -e "${GREEN}Symlink for $domain removed successfully.${NC}"
         fi
 
         # Prompt to remove logs

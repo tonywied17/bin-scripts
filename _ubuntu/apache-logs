@@ -18,7 +18,6 @@ filter_primary_logs() {
 
     # List all files in the log directory
     mapfile -t files < <(sudo ls "$LOG_DIR")
-
     if [ ${#files[@]} -eq 0 ]; then
         echo -e "${RED}No log files found in $LOG_DIR.${NC}"
         return
@@ -52,9 +51,6 @@ filter_primary_logs() {
 
 #! Purge logs that don't match any enabled Apache sites
 purge_unmatched_logs() {
-
-    # Fetch primary logs
-    log_files=()
     mapfile -t files < <(sudo ls "$LOG_DIR")
 
     if [ ${#files[@]} -eq 0 ]; then
@@ -62,23 +58,36 @@ purge_unmatched_logs() {
         return
     fi
 
-    # List enabled apache sites
-    mapfile -t enabled_sites < <(sudo ls "$APACHE_SITES_DIR" | sed 's/\.conf//g')
+    mapfile -t enabled_sites < <(sudo ls "$APACHE_SITES_DIR" | sed 's/\.conf$//g')
+    # echo "Enabled sites: ${enabled_sites[*]}"
 
     # Filter unmatched logs
     unmatched_logs=()
     for log in "${files[@]}"; do
-        # Skip main access and error logs
-        if [[ "$log" == *"access.log" || "$log" == *"error.log" ]]; then
+
+        if [[ "$log" == "access.log" || "$log" == "error.log" ]]; then
+            # echo "skipping: $log (main access or error log)"
             continue
         fi
 
-        domain_name=$(echo "$log" | sed -E 's/-access\.log$//; s/-error\.log$//')
+        domain_name=$(echo "$log" | sed -E 's/-(access|error)\.log$//')
+        # echo "domain: $domain_name"
 
-        # Check if the domain is not in enabled sites
-        if [[ ! " ${enabled_sites[*]} " =~ " ${domain_name} " ]]; then
+        is_enabled_site=false
+        for site in "${enabled_sites[@]}"; do
+            if [[ "$site" == "$domain_name" ]]; then
+                echo "Match found: $domain_name is in enabled sites."
+                is_enabled_site=true
+                break
+            fi
+        done
+
+        if [[ "$log" != *.log || "$is_enabled_site" == false ]]; then
             unmatched_logs+=("$log")
+            # echo "Added to unmatched logs: $log"
         fi
+
+        is_enabled_site=false
     done
 
     # Display unmatched logs and prompt for action
@@ -101,6 +110,7 @@ purge_unmatched_logs() {
         fi
     fi
 }
+
 
 #! Purge backup logs
 purge_backup_logs() {
@@ -136,7 +146,7 @@ purge_backup_logs() {
 #! Main menu
 while true; do
     echo -e "\nMenu:"
-    echo "1) Filter Primary Logs"
+    echo "1) View Apache Logs"
     echo "2) Purge Unmatched Logs"
     echo "3) Purge Backup Logs"
     echo "4) Exit"
