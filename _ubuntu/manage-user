@@ -6,7 +6,130 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-#! Function to check if a domain is pointing to the server
+
+#! Add a new user and set up Apache
+add_user_and_setup_apache() {
+    read -p "Enter domain (e.g., example.com or subdomain.molex.cloud): " domain
+    read -p "Enter username: " username
+    read -sp "Enter password: " password
+    echo ""
+
+    #* ensure the domain is pointing to the server
+    check_domain "$domain" || return 1
+
+
+    #@ Add User setup -----
+
+    # Check if the user already exists
+    if id "$username" &>/dev/null; then
+        echo -e "${RED}User $username already exists. Exiting.${NC}"
+        return 1
+    fi
+    if sudo adduser --quiet --disabled-password --gecos "" --home "/home/$username" "$username"; then
+        echo -e "${GREEN}User $username added successfully.${NC}"
+    else
+        echo -e "${RED}Failed to add user $username. Exiting.${NC}"
+        return 1
+    fi
+    echo "$username:$password" | sudo chpasswd
+
+
+    #@ Home directory setup -----
+
+    # Create public_html directory
+    sudo mkdir -p /home/"$username"/public_html
+    sudo chown -R "$username":"$username" /home/"$username"/public_html
+    sudo chmod 755 /home/"$username"
+
+    # Create cgi-bin directory
+    sudo mkdir -p /home/"$username"/public_html/cgi-bin
+    sudo chown -R "$username":"$username" /home/"$username"/public_html/cgi-bin
+    sudo chmod -R 755 /home/"$username"/public_html/cgi-bin
+
+    # Move .dir directory into public_html (from skel)
+    if [ -d /home/"$username"/.dir ]; then
+        sudo mv /home/"$username"/.dir /home/"$username"/public_html/
+        sudo chown -R "$username":"$username" /home/"$username"/public_html/.dir
+    else
+        echo -e "${YELLOW}Warning: .dir does not exist for user $username.${NC}"
+    fi
+
+    # Move .htaccess file into public_html (from skel)
+    if [ -e /home/"$username"/.htaccess ]; then
+        sudo mv /home/"$username"/.htaccess /home/"$username"/public_html/.htaccess
+        sudo chown "$username":"$username" /home/"$username"/public_html/.htaccess
+    else
+        echo -e "${YELLOW}Warning: .htaccess does not exist for user $username.${NC}"
+    fi
+
+    # Use welcome.md template and replace placeholders
+    welcome_template="templates/welcome.md"
+    welcome_file="/home/$username/public_html/welcome.md"
+
+    if [[ -f "$welcome_template" ]]; then
+        sudo cp "$welcome_template" "$welcome_file"
+        sudo sed -i "s/{DOMAIN}/$domain/g" "$welcome_file"
+        sudo sed -i "s/{USERNAME}/$username/g" "$welcome_file"
+        echo -e "${GREEN}Welcome file created for $domain.${NC}"
+    else
+        echo -e "${RED}Welcome template not found.${NC}"
+    fi
+
+
+    #@ Apache setup -----
+
+    # Remove subdomain if present
+    base_domain="${domain#*.}"
+
+    # Determine the template suffix based on the domain
+    template_suffix=""
+    for template in templates/*.conf; do
+        if [[ "$(basename "$template")" == "$base_domain.conf" || "$(basename "$template")" == "${base_domain}-le-ssl.conf" ]]; then
+            template_suffix="$(basename "$template" .conf)" 
+            break
+        fi
+    done
+
+    # If no matching template is found, use default template
+    if [[ -z "$template_suffix" ]]; then
+        echo -e "${RED}No template found for $domain. Using default new-domain.com.${NC}"
+        template_suffix="new-domain.com"
+    fi
+
+    # Copy the template and create the configuration
+    config_file="/etc/apache2/sites-available/$domain.conf"
+    sudo cp "templates/$template_suffix.conf" "$config_file"
+    sudo sed -i "s|{DOMAIN}|$domain|g" "$config_file"
+    sudo sed -i "s|{USERNAME}|$username|g" "$config_file"
+
+    # Enable the new site configuration
+    sudo a2ensite "$domain.conf"
+
+    # Default template run certbot to setup SSL
+    if [[ "$template_suffix" == "new-domain.com" ]]; then
+        echo -e "${YELLOW}Setting up SSL for $domain using Certbot...${NC}"
+        sudo certbot --apache --non-interactive --agree-tos --email admin@$domain -d "$domain" -d "www.$domain"
+    else
+        # Otherwise, the SSL config is expected to be handled by the SSL template
+        ssl_config_file="/etc/apache2/sites-available/$domain-le-ssl.conf"
+        if [[ -f "templates/${template_suffix}-le-ssl.conf" ]]; then
+            sudo cp "templates/${template_suffix}-le-ssl.conf" "$ssl_config_file"
+            sudo sed -i "s|{DOMAIN}|$domain|g" "$ssl_config_file"
+            sudo sed -i "s|{USERNAME}|$username|g" "$ssl_config_file"
+            sudo a2ensite "${domain}-le-ssl.conf"
+        fi
+    fi
+
+    # Reload apache and apply changes
+    sudo systemctl reload apache2
+    echo -e "${GREEN}Apache configuration for $domain has been set up successfully!${NC}"
+}
+
+
+
+#@ Helper Functions -----
+
+#! Check if the domain is pointing to the server's ip
 check_domain() {
     local domain=$1
     local expected_ip="172.105.148.88"
@@ -21,124 +144,54 @@ check_domain() {
     return 0
 }
 
-#! Function to add a new user and set up Apache
-add_user_and_setup_apache() {
-    read -p "Enter domain (e.g., example.com): " domain
-    read -p "Enter username: " username
-    read -sp "Enter password: " password
-    echo ""
+# TODO: 
+#! Generate Apache config from template
+generate_apache_config() {
+    local domain=$1
+    local username=$2
+    local template_suffix=$3
 
-    # Check if the domain is pointing to the server
-    check_domain "$domain" || return 1
-
-    # Add user silently
-    if sudo adduser --quiet --disabled-password --gecos "" --home "/home/$username" "$username"; then
-        echo -e "${GREEN}User $username added successfully.${NC}"
-    else
-        echo -e "${RED}Failed to add user $username. Exiting.${NC}"
+    # Determine the template file based on the suffix
+    template_file="templates/${template_suffix}.conf"
+    if [[ ! -f "$template_file" ]]; then
+        echo -e "${RED}Template $template_file not found.${NC}"
         return 1
     fi
 
-    # Set the user's password
-    echo "$username:$password" | sudo chpasswd
+    # Set the output file path for Apache configuration
+    output_file="/etc/apache2/sites-available/${domain}.conf"
 
-    # Create public_html directory
-    sudo mkdir -p /home/"$username"/public_html
-    sudo chown -R "$username":"$username" /home/"$username"/public_html
-    sudo chmod -R 755 /home/"$username"
+    # Copy the template to the output file
+    sudo cp "$template_file" "$output_file"
 
-    # Create cgi-bin directory
-    sudo mkdir -p /home/"$username"/public_html/cgi-bin
-    sudo chown -R "$username":"$username" /home/"$username"/public_html/cgi-bin
-    sudo chmod -R 755 /home/"$username"/public_html/cgi-bin
+    # Replace placeholders with actual values
+    sudo sed -i "s/{DOMAIN}/$domain/g" "$output_file"
+    sudo sed -i "s/{USERNAME}/$username/g" "$output_file"
 
-    # Create welcome.md file
-    sudo tee /home/"$username"/public_html/welcome.md > /dev/null <<EOL
-# Welcome to $domain
-
-This is the default page for $domain.
-
-## FTP Access
-You can upload your files to this server using an FTP client.
-
-### FTP Details
-- **Host:** $domain
-- **Username:** $username
-- **Password:** Your chosen password
-- **Port:** 21
-
-## Webmail
-You can access the roundcube webmail client by visiting [mail.$domain](https://mail.$domain).
-
-## Postfix Admin
-You can manage your email accounts using the Postfix Admin interface.
-EOL
-
-    # Move .dir directory into public_html
-    if [ -d /home/"$username"/.dir ]; then
-        sudo mv /home/"$username"/.dir /home/"$username"/public_html/
-        sudo chown -R "$username":"$username" /home/"$username"/public_html/.dir
-    else
-        echo -e "${YELLOW}Warning: .dir does not exist for user $username.${NC}"
-    fi
-
-    # Move .htaccess file into public_html
-    if [ -e /home/"$username"/.htaccess ]; then
-        sudo mv /home/"$username"/.htaccess /home/"$username"/public_html/.htaccess
-        sudo chown "$username":"$username" /home/"$username"/public_html/.htaccess
-    else
-        echo -e "${YELLOW}Warning: .htaccess does not exist for user $username.${NC}"
-    fi
-
-    # Create Apache config for the new site
-    sudo tee /etc/apache2/sites-available/"$domain".conf > /dev/null <<EOL
-<VirtualHost *:80>
-    ServerName $domain
-    DocumentRoot /home/$username/public_html
-
-    <Directory /home/$username/public_html>
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    ErrorLog \${APACHE_LOG_DIR}/$domain-error.log
-    CustomLog \${APACHE_LOG_DIR}/$domain-access.log combined
-</VirtualHost>
-EOL
-
-    # Enable the new site and reload apache
-    sudo a2ensite "$domain.conf"
-    sudo systemctl reload apache2
-
-    # Prompt to set up SSL certificate
-    read -p "Do you want to set up an SSL certificate for $domain? (y/n): " setup_ssl
-    if [[ "$setup_ssl" == "y" ]]; then
-        setup_ssl_certificate "$domain"
-    fi
+    echo -e "${GREEN}Apache configuration for $domain created from template.${NC}"
 }
 
 #! Set up SSL certificate with Certbot
 setup_ssl_certificate() {
     local domain=$1
-    echo -e "${YELLOW}Setting up SSL certificate for $domain...${NC}"
+    echo -e "${YELLOW}Setting up SSL certificate for $domain and www.$domain...${NC}"
     
-    sudo certbot --apache --email tonywied17@gmail.com --agree-tos --no-eff-email --redirect -d "$domain"
+    sudo certbot --apache --email tonywied17@gmail.com --agree-tos --no-eff-email --redirect -d "$domain" -d "www.$domain"
     
-    echo -e "${GREEN}SSL certificate for $domain has been set up successfully.${NC}"
+    echo -e "${GREEN}SSL certificate for $domain and www.$domain has been set up successfully.${NC}"
 }
 
 #! Renew an SSL certificate for a given domain
 renew_ssl_certificate() {
     read -p "Enter the domain to renew SSL (e.g., example.com): " domain
-    echo -e "${YELLOW}Renewing SSL certificate for $domain...${NC}"
+    echo -e "${YELLOW}Renewing SSL certificate for $domain and www.$domain...${NC}"
     
     sudo certbot renew --cert-name "$domain" --quiet
     
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}SSL certificate for $domain renewed successfully, if it was due for renewal.${NC}"
+        echo -e "${GREEN}SSL certificate for $domain and www.$domain renewed successfully, if it was due for renewal.${NC}"
     else
-        echo -e "${RED}Failed to renew SSL certificate for $domain.${NC}"
+        echo -e "${RED}Failed to renew SSL certificate for $domain and www.$domain.${NC}"
     fi
 }
 
@@ -164,8 +217,7 @@ remove_user_and_cleanup() {
         # Configuration files
         config_file="/etc/apache2/sites-available/${domain}.conf"
         ssl_config_file="/etc/apache2/sites-available/${domain}-le-ssl.conf"
-        cert_dir="/etc/letsencrypt/live/${domain}"
-
+        
         # Remove the main configuration file
         if [ -f "$config_file" ]; then
             echo -e "${YELLOW}Removing Apache configuration for $domain...${NC}"
@@ -189,6 +241,14 @@ remove_user_and_cleanup() {
             echo -e "${YELLOW}Removing symlink for $domain in sites-enabled...${NC}"
             sudo rm "$symlink_file"
             echo -e "${GREEN}Symlink for $domain removed successfully.${NC}"
+        fi
+
+        # Remove symlink in sites-enabled for the SSL config
+        ssl_symlink_file="/etc/apache2/sites-enabled/${domain}-le-ssl.conf"
+        if [ -L "$ssl_symlink_file" ]; then
+            echo -e "${YELLOW}Removing symlink for $domain-le-ssl in sites-enabled...${NC}"
+            sudo rm "$ssl_symlink_file"
+            echo -e "${GREEN}Symlink for $domain-le-ssl removed successfully.${NC}"
         fi
 
         # Prompt to remove logs
@@ -223,14 +283,14 @@ show_menu() {
         echo "2) Renew SSL Certificate"
         echo "3) Remove User and Apache Configuration"
         echo "4) Exit"
-        read -p "Select an option (1-3): " option
+        read -p "Select an option (1-4): " option
 
         case $option in
             1) add_user_and_setup_apache ;;
             2) renew_ssl_certificate ;;
             3) remove_user_and_cleanup ;;
             4) echo "Exiting..."; exit 0 ;;
-            *) echo -e "${RED}Invalid option. Please select 1-3.${NC}" ;;
+            *) echo -e "${RED}Invalid option. Please select 1-4.${NC}" ;;
         esac
     done
 }
