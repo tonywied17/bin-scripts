@@ -1,2 +1,2 @@
 # bin-scripts
-some bin scripts to help with my dev workflow
+some bin scripts and template files to help automate some tasks for my linux web server

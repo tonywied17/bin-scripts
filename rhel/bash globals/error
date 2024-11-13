@@ -1,5 +1,0 @@
-#!/bin/bash
-
-cd /var/log/apache2
-linesToShow="${1:-20}"
-tail -n "$linesToShow" error_log
