@@ -57,4 +57,4 @@ View apache logs, purge unmatched logs that don't have enabled apache configurat
 symlinks
 ```
 Simply view symbolic links and their target.
-![symlinks](https://raw.githubusercontent.com/tonywied17/linux-bin-scripts/refs/heads/main/assets/symlinks.png)
+![symlinks](https://raw.githubusercontent.com/tonywied17/linux-bin-scripts/refs/heads/main/assets/symlinks-1.png)
