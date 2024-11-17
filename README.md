@@ -50,6 +50,7 @@ This will enable/disable 2 factor authentication for ssh on a linux server. It w
 apache-logs
 ```
 View apache logs, purge unmatched logs that don't have enabled apache configuration anymore, and purge backup logs.
+![apache-logs](https://raw.githubusercontent.com/tonywied17/linux-bin-scripts/refs/heads/main/assets/apache-logs.png)
 
 ## SymLinks
 ```bash
