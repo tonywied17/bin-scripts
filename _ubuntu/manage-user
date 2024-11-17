@@ -63,7 +63,7 @@ add_user_and_setup_apache() {
     fi
 
     # Use welcome.md template and replace placeholders
-    welcome_template="templates/welcome.md"
+    welcome_template="/usr/local/bin/templates/welcome.md"
     welcome_file="/home/$username/public_html/welcome.md"
 
     if [[ -f "$welcome_template" ]]; then
@@ -78,19 +78,31 @@ add_user_and_setup_apache() {
 
     #@ Apache setup -----
 
-    # Remove subdomain if present
-    base_domain="${domain#*.}"
+    # Remove subdomain if present to determine the base domain
+    if [[ "$domain" =~ ^([^.]+)\.(.+)$ ]]; then
+        base_domain="${BASH_REMATCH[2]}"
+    else
+        base_domain="$domain"
+    fi
+    echo "Base domain detected: $base_domain"
 
-    # Determine the template suffix based on the domain
+    # Initialize template_suffix to store the matched template
     template_suffix=""
-    for template in templates/*.conf; do
-        if [[ "$(basename "$template")" == "$base_domain.conf" || "$(basename "$template")" == "${base_domain}-le-ssl.conf" ]]; then
-            template_suffix="$(basename "$template" .conf)" 
+
+    # Loop through templates to find a match
+    for template in /usr/local/bin/templates/*.conf; do
+        # Get the template filename without the .conf extension
+        template_name="$(basename "$template" .conf)"
+
+        # Check if the template name matches the base domain or SSL configuration
+        if [[ "$template_name" == "$base_domain" || "$template_name" == "$base_domain-le-ssl" ]]; then
+            echo "Template matched: $template_name"
+            template_suffix="$template_name"
             break
         fi
     done
 
-    # If no matching template is found, use default template
+    # If no matching template is found, use the default template
     if [[ -z "$template_suffix" ]]; then
         echo -e "${RED}No template found for $domain. Using default new-domain.com.${NC}"
         template_suffix="new-domain.com"
@@ -98,31 +110,40 @@ add_user_and_setup_apache() {
 
     # Copy the template and create the configuration
     config_file="/etc/apache2/sites-available/$domain.conf"
-    sudo cp "templates/$template_suffix.conf" "$config_file"
-    sudo sed -i "s|{DOMAIN}|$domain|g" "$config_file"
-    sudo sed -i "s|{USERNAME}|$username|g" "$config_file"
+    template_path="/usr/local/bin/templates/$template_suffix.conf"
 
-    # Enable the new site configuration
-    sudo a2ensite "$domain.conf"
+    if [[ -f "$template_path" ]]; then
+        sudo cp "$template_path" "$config_file"
+        sudo sed -i "s|{DOMAIN}|$domain|g" "$config_file"
+        sudo sed -i "s|{USERNAME}|$username|g" "$config_file"
+        sudo a2ensite "$domain.conf"
+    else
+        echo -e "${RED}Template file $template_path does not exist. Aborting!${NC}"
+        cleanup_failed_setup
+        exit 1
+    fi
 
-    # Default template run certbot to setup SSL
+    # Run Certbot for the default template or handle SSL configurations otherwise
     if [[ "$template_suffix" == "new-domain.com" ]]; then
         echo -e "${YELLOW}Setting up SSL for $domain using Certbot...${NC}"
         sudo certbot --apache --non-interactive --agree-tos --email admin@$domain -d "$domain" -d "www.$domain"
     else
-        # Otherwise, the SSL config is expected to be handled by the SSL template
+        # Otherwise, SSL configuration is expected to be handled by the SSL template
         ssl_config_file="/etc/apache2/sites-available/$domain-le-ssl.conf"
-        if [[ -f "templates/${template_suffix}-le-ssl.conf" ]]; then
-            sudo cp "templates/${template_suffix}-le-ssl.conf" "$ssl_config_file"
+        if [[ -f "/usr/local/bin/templates/${template_suffix}-le-ssl.conf" ]]; then
+            sudo cp "/usr/local/bin/templates/${template_suffix}-le-ssl.conf" "$ssl_config_file"
             sudo sed -i "s|{DOMAIN}|$domain|g" "$ssl_config_file"
             sudo sed -i "s|{USERNAME}|$username|g" "$ssl_config_file"
             sudo a2ensite "${domain}-le-ssl.conf"
         fi
     fi
 
-    # Reload apache and apply changes
+    # Reload Apache to apply changes
     sudo systemctl reload apache2
+    sudo systemctl restart apache2
     echo -e "${GREEN}Apache configuration for $domain has been set up successfully!${NC}"
+
+
 }
 
 
@@ -272,6 +293,7 @@ remove_user_and_cleanup() {
             fi
         fi
     fi
+
 }
 
 #! Main menu
